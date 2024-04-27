@@ -8,10 +8,10 @@
     * Tech stack: Python
     * [Project Report](https://github.com/mmartin131/portfolio/blob/main/Garden_Planner/garden_planner_project_proposal.pdf)
 - [Analysis of Illegal Cheetah Trade](https://github.com/mmartin131/portfolio/tree/main/Analysis_of_Illegal_Cheetah_Trade)
-    * Summary: 
+    * Summary: Group project  
     * Tech stack: Python, Pandas, Bokeh, Geopandas
-    * [Project Report](https://github.com/mmartin131/portfolio/blob/main/Analysis_of_Illegal_Cheetah_Trade/Project_2_Diabes_Grimes_Martin_Final.pdf)
-- [Impact of Danceability on Spotify Track Popularity]() 
+    * [Project Report](https://github.com/mmartin131/portfolio/blob/main/Analysis_of_Illegal_Cheetah_Trade/Project_2_Diabes_Grimes_Martin_Final_Report.pdf)
+- [Impact of Danceability on Spotify Track Popularity](https://github.com/mmartin131/portfolio/tree/main/Impact%20of%20Danceability%20on%20Spotify%20Track%20Popularity) 
     * Summary: 
     * Tech stack: R, ggplot2, Linear Regression
     * Project Report
