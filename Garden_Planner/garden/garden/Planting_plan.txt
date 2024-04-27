@@ -1,0 +1,31 @@
+Megan's Custom Garden Plan
+
+Plan for a 24 by 18 size garden.
+
+You can fit 6 types of plants in this size garden.
+
+Here's your selected plant list: Tomato, Pepper, Tomato, Pepper, Tomato, Pepper
+You can fit 6 Tomatoes in one row spaced 36 inches apart.
+You can fit 12 Peppers in one row spaced 18 inches apart.
+You can fit 6 Tomatoes in one row spaced 36 inches apart.
+You can fit 12 Peppers in one row spaced 18 inches apart.
+You can fit 6 Tomatoes in one row spaced 36 inches apart.
+You can fit 12 Peppers in one row spaced 18 inches apart.
+
+Here's a possible layout for your plan: 
+T.T.T.T.T.T.
+PPPPPPPPPPPP
+
+Your zip code is: 84414. Your zip code is located in hardiness zone 6b.
+
+Here's your planting schedule for your Tomato plant: 
+Seed Start Date: Feb 19 - Mar 4
+Transplant Seedlings: Apr 29 - May 13
+Growth time: 10 weeks to first harvest
+Harvest Date: Jul 8 - Jul 22
+
+Here's your planting schedule for your Pepper plant: 
+Seed Start Date: Feb 19 - Mar 4
+Transplant Seedlings: Apr 29 - May 13
+Growth time: 10 weeks to first harvest
+Harvest Date: Jul 8 - Jul 22
