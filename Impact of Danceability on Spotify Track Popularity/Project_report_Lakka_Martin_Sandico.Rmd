@@ -1,0 +1,585 @@
+---
+title: 'Impact of Danceability on Spotify Track Popularity'
+author: "Saniya Lakka, Megan Martin, Andrew Sandico"
+subtitle: 'Datasci W203: Lab 2'
+output:
+  pdf_document:
+    toc: yes
+  bookdown::pdf_document2:
+    toc: yes
+    number_sections: yes
+  html_document:
+    toc: yes
+    df_print: paged
+---
+
+\newpage
+\setcounter{page}{1}
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+```
+
+```{r, correlation plot package, include=FALSE}
+#install.packages('corrplot')
+```
+
+```{r, include=FALSE}
+library(readr)
+library(ggplot2)
+library(tidyverse)
+library(corrplot)
+library(stargazer)
+library(sandwich)
+library(lmtest)
+library(patchwork)
+library(car)
+```
+
+```{r source functions from project, echo = FALSE}
+source('./src/get_robust_se.R')
+```
+
+```{r data, include = FALSE, echo=FALSE}
+spotify_data_1 <- read_csv("spotify_data.csv")
+spotify_data_2 <- read_csv("spotify_data_2.csv")
+spotify_data <- rbind(spotify_data_1,spotify_data_2)
+#View(spotify_data)
+```
+
+
+```{r, echo=FALSE}
+#glimpse(spotify_data)
+```
+
+
+# 1. Introduction
+## 1.1 Motivation
+
+Accurate predicting of music preferences is an important product feature for spotify to maintain user engagement and personalization. By increasing user engagement, users will spend more time on Spotify vs. other platforms leading to increasing revenue streams. Per Spotify's 2021 annual report, the company's first key risk factor is "We face significant competition and we might not be successful at attracting and retaining users; including through predicting, recommending, and playing content that our users enjoy, or monetizing our products and services including podcasts and other non-music content"^1^. To date, Spotify has successfully grown both their monthly active users and premium subscribers year over year: 
+
+![](statista){width=70%}
+
+Spotify monetizes by usage (how many times a song is played and how long a user stays on the app). As part of the data scientist team for Acme, Inc, we are supporting Spotify to optimize their monetization strategy. As number of streams (song plays) is a key metric to Spotify’s ongoing revenue and growth plans, we seek to maximize the number of streams by identifying the key audio feature that causes an increased number of streams. Spotify provides robust descriptive metrics, called song features, for each song within its database. While the number of streams on Spotify is not readily available to the public in most situations, a metric called track popularity can be used as a proxy for understanding how much a song/track has been played.   
+
+## 1.2 Research Question
+
+Due to the importance of predicting and recommending track popularity for maintaining users on the spotify platform, our research will be focused on identifying the key audio features for track popularity. With multiple audio features available for songs, this research will be focused on identifying the one key feature that causes track popularity leveraging an explanatory model. Specifically we aim to answer the following research question:
+
+\begin{quote}
+  \textit{How does the danceability score for a spotify song affect its track popularity?}
+\end{quote}
+
+With multiple types of songs and preferences available to a user, a key audio feature that would encourage repeatable plays would be of interest for optimizing a monetization strategy. Thus, we propose selecting a feature that creates motivation for a user to replay a song. We have selected the danceability feature for this conceptual model due to the connection to social events (going to a party, listening with friends, motivating oneself individually to dance).  We will use the understanding between danceability and track popularity to make decisions on Spotify’s selection of tracks to share or promote with their users. 
+
+# 2 Data and Methodology
+## 2.1 About the Data
+
+For our analysis we leveraged the Spotify API to generate our dataset. The Spotify API allows retrieval of playlist data by inputting a url of a spotify playlist into an API function. To access the Spotify API, we utilized a python package called spotipy which allowed us to retrieve audio features for each song in a playlist. After retrieving the data from the API we configured it into a dataframe and exported it to a csv for use. 
+
+Selection of the playlists to retrieve the audio features was an important consideration. Because existing playlists on the platform are either user-generated or optimized by algorithm, we needed to generate new playlists containing randomly selected songs. We utilized an online web application called [randify](https://www.randify.app/) which randomly selects Spotify songs from an extensive database in order to create new playlists. Due to limitations with the Spotify API, song features could only be retrieved for playlists containing 50 songs at a time. We generated 14 playlists utilizing randify. After generation of the randomized Spotify playlists, song feature data was pulled utilizing the Spotify API. From these playlists, a total of 700 rows (samples) and 22 columns (variables) were used to create our initial dataset. 
+
+Below is a table of the variables we will be using in our analysis paired with their definition, as well as reasons why we chose to omit certain variables.
+Descriptions of spotify’s song feature metrics were obtained from [here](https://developer.spotify.com/documentation/web-api/reference/#/operations/get-audio-features).
+
+```{r table2, echo=FALSE, message=FALSE, warnings=FALSE, results='asis', fig.width=10}
+
+#plot feature table
+
+tabl <- "
+| Column Name  | Definition           | Included/Omitted  |
+|-----------|-------------|------|
+| Track Popularity      | Popularity of track calculated by # of plays the track has had and how recent they were played. (0-100) | Included; outcome variable |
+|---------------------------------------------|-----------------------------------------------------|-----------------------|
+| Danceability      | A 0-1 scale. Danceability describes how suitable a track is for dancing based on a combination of musical elements including tempo, rhythm stability, beat strength, and overall regularity. A value of 0.0 is least danceable and 1.0 is most danceable.      | Included |
+|---------------------------------------------|-----------------------------------------------------|-----------------------|
+| Acousticness | A 0-1 scale where closer to 1 means high confidence the track is acoustic.     |  Included |
+|---------------------------------------------|-----------------------------------------------------|-----------------------|
+| Artist Popularity | Popularity of an artist from 0-100 where 100 is most popular.     |  Omitted: Derived from track popularity metric and Spotify algorithm, resulting in reverse causality with track popularity metric. |
+|---------------------------------------------|-----------------------------------------------------|-----------------------|
+| Duration | Duration of the track.      | Omitted: This was a filtered variable in the original dataset.  |
+|---------------------------------------------|-----------------------------------------------------|-----------------------|
+| Energy | A 0-1 scale. How energetic a track is: loud, noisy, upbeat etc.      | Included  |
+|---------------------------------------------|-----------------------------------------------------|-----------------------|
+| Instrumentalness  | A 0-1 scale. How many vocals are in a track compared to instruments. The closer to a score of 1, the more likely the track is purely instrumental.     | Included  |
+|---------------------------------------------|-----------------------------------------------------|-----------------------|
+| Key  | The key the track is in. Integers map to pitches using standard pitch class notation (0-11; 0 = “C”, etc).       | Omitted: This is an ordinal variable with 12 outcomes.   |
+|---------------------------------------------|-----------------------------------------------------|-----------------------|
+| Liveness  | A 0-1 scale. Detects whether the track was a live performance.       | Included  |
+|---------------------------------------------|-----------------------------------------------------|-----------------------|
+| Loudness  | -1 to -100.  Loudness of a track in decibels.      | Omitted: this is a metric used in the energy variable.  |
+|---------------------------------------------|-----------------------------------------------------|-----------------------|
+| Mode  | Binary 0 or 1. Whether the track is more major = 1 or minor = 0.      | Included  |
+|---------------------------------------------|-----------------------------------------------------|-----------------------|
+| Speechiness  | A 0-1 scale.  The presence of spoken words a.k.a an audio book or podcast etc.  | Omitted: We are choosing to filter out the spoken word tracks, thus this feature is not necessary.  |
+|---------------------------------------------|-----------------------------------------------------|-----------------------|
+| Tempo  | Tempo of a track in beats per minute.      | Omitted: Closely related to the energy metric.  |
+|---------------------------------------------|-----------------------------------------------------|-----------------------|
+| Time Signature  | How many beats are in each bar.      | Omitted: Closely related to the energy metric. |
+|---------------------------------------------|-----------------------------------------------------|-----------------------|
+| Valence  | A 0-1 scale.  How positive a track is. Tracks with higher scores sound happier, cheerful, euphoric while tracks with low score sound sad, depressed, angry.  | Included  |
+"
+cat(tabl) # output the table in a format good for HTML/PDF/docx conversion
+```
+
+## 2.2 Data Cleansing and Initial Findings
+
+```{r combined dataset, include=FALSE} 
+
+## EDA
+
+#First, get original sample size:
+nrows_original <- nrow(spotify_data)
+
+#track id is unique for each song on Spotify. Will use the id field to determine if any repeated songs are present: 
+track_id_freq <- data.frame(table(spotify_data$id))
+track_id_freq[track_id_freq$Freq > 1,]
+
+#There are no repeated track ids in the dataset. 
+#Next, check for na values: 
+sapply(spotify_data, function(x) sum(is.na(x)))
+#There are no na values present in the dataframe
+
+#Next, need to check the reliability/validity of each variable. Check for correct format, check for range if numeric. 
+# Track id: Per Spotify, should be 22 characters (alphanumeric)
+sum(nchar(as.character(spotify_data$id)) != 22)
+#All track IDs are 22 characters long. 
+
+#There may be repeated versions of songs (same song name and artist, different track number). Will check for repeated artist/song combos: 
+repeated_table <- table(duplicated(spotify_data[c("artist_name", "track_name")]))
+#There are no repeated artist/combinations in the dataset.
+
+#Looking at expected ranges for the numeric variables in the dataset.
+variable_ranges <- data.frame(min=sapply(spotify_data,min),max=sapply(spotify_data,max))
+rows_to_remove <- c("analysis_url", "artist_name", "id", "track_href", "track_name", "type", "uri")
+variable_ranges <- variable_ranges[!(row.names(variable_ranges) %in% rows_to_remove),]
+view(variable_ranges)
+
+#All numeric variables appear to be in the expected ranges per the spotify documentation: https://developer.spotify.com/documentation/web-api/reference/#/operations/get-audio-features
+#Speechiness- are there tracks that are only spoken? We should consider removing these. Values above .66 describe tracks that are likely to be fully spoken. 
+high_speechiness_songs <- spotify_data[spotify_data$speechiness > .66,]
+nrows_high_speechiness <- nrow(high_speechiness_songs)
+#Drop the high speech songs, these appear to be audio book chapters.
+spotify_data <- spotify_data[which(spotify_data$speechiness <= .66),]
+
+#Look at song length; convert first to minutes; milliseconds ÷ 60,000 = Min
+spotify_data <- spotify_data %>%
+  mutate(
+  length_min = (duration_ms/60000)
+  )
+length_histogram <- spotify_data%>%
+  ggplot() +
+  aes(x= length_min) +
+  geom_histogram(bins=30)  + 
+  labs(
+    title = "Histogram of Song Length",
+    x = "Song Length (min)",
+    y = "Count"
+  ) 
+range(spotify_data$length_min)
+
+#The interquartile range (IQR) is the difference between the 75th percentile (Q3) and the 25th percentile (Q1) in a dataset. It measures the spread of the middle 50% of values.
+#You could define an observation to be an outlier if it is 1.5 times the interquartile range greater than the third quartile (Q3) or 1.5 times the interquartile range less than the first quartile (Q1).
+#Song length quartiles: 
+Q1 <- quantile(spotify_data$length_min, .25)
+Q3 <- quantile(spotify_data$length_min, .75)
+IQR <- IQR(spotify_data$length_min)
+spotify_data_no_outliers <- subset(spotify_data, spotify_data$length_min> (Q1 - 1.5*IQR) & spotify_data$length_min< (Q3 + 1.5*IQR))
+nrows_remove_outliers <- (nrow(spotify_data) - nrow(spotify_data_no_outliers))
+#Outlier songs removed
+length_histogram_no_outliers <- spotify_data_no_outliers%>%
+  ggplot() +
+  aes(x= length_min) +
+  geom_histogram(bins=30)  + 
+  labs(
+    title = "Histogram of Song Length",
+    x = "Song Length (min)",
+    y = "Count"
+  ) 
+length_histogram
+length_histogram_no_outliers
+summary(spotify_data_no_outliers$length_min)
+
+#Remaining data is 48 seconds to 6.11 min, which seems to encompass the length of typical songs. Note that the average song length is ~3.5 min, so this dataset seems representative of typical songs. 
+
+#Drop these 0 popularity scores. Justification is that track popularity is calculated based on number of plays. With a 0 score, the songs have not been played. 
+zero_popularity <- spotify_data_no_outliers[spotify_data_no_outliers$track_popularity == 0,]
+nrows_zero_popularity <- nrow(zero_popularity)
+spotify_data_final <- spotify_data_no_outliers[which(spotify_data_no_outliers$track_popularity > 0),]
+nrows_spotify_data_final <- nrow(spotify_data_final)
+```
+
+```{r, echo=FALSE}
+# Create training and testing set
+set.seed(1)
+dt = sort(sample(nrow(spotify_data_final), nrow(spotify_data_final)*.7))
+train <-spotify_data_final[dt,]
+test <-spotify_data_final[-dt,]
+```
+
+After loading the data into R we began to clean it by checking for missing (n.a.) values, duplicated tracks, and track ids that were not 22 characters in length (per Spotify, the track id should be 22 characters). Next we removed tracks where the “speechiness” scores above .66, because these are spoken word tracks (ie. audio book chapters) and are not useful for our investigation. 
+
+In order to remove outliers of song length, we used the interquartile range method which calculated the difference between the 75th percentile (Q3) and the 25th percentile (Q1) of song lengths in the dataset. We defined an observation to be an outlier if it is 1.5 times the interquartile range greater than the third quartile (Q3) or 1.5 times the interquartile range less than the first quartile (Q1). By performing this calculation we only included tracks that were between 48 seconds and 6.11 minutes, which seems to represent typical song lengths.   Adding confidence to our method for dropping outliers, this filtered dataset has an average track length of ~3.5 minutes, which is the historical average length of popular songs^2^. 
+
+Finally, we removed tracks that had a track popularity score of 0. Per Spotify, the track popularity is calculated based on number of plays and artist popularity. With a 0 score, the songs are likely to not have been played or have been played very little. 
+
+A description of the sample size due to the various data cleansing methods is provided below. 
+
+
+```{r table3, echo=FALSE, message=FALSE, warnings=FALSE, results='asis'}
+tabl <- "
+| Cause        | Number of Samples for Analysis (After Removal for Cause)           | Removed Number of Samples for Cause  |
+|---------------|-------------|------|
+| Original      | 700 |  |
+| Speechiness > .66 | 673      | 27 |
+| Song Length Outliers | 613  | 60 |
+| Track Popularity = 0 | 485  |  128 |
+| Final total | 485      |   |
+"
+cat(tabl) 
+```
+
+After data cleansing, the distributions of feature scores are as follows. Note that appears to be heavy skewing in the features (liveness, acousticness, loudness, instrumentalness). Log transformations were conducted on these variables, however, it did not result in a more normalized distribution for these features. Thus, log transformations were not utilized for the independent variables. 
+
+```{r, echo=FALSE}
+features_train <-  train[c('track_popularity','danceability', 'acousticness', 'energy', 'instrumentalness', 'key', 'liveness', 'loudness', 'mode', 'valence')]
+```
+```{r fig.width=10, fig.height=8, echo=FALSE}
+#Side by side histograms for all metric variables 
+dimension = function(df){
+kk = dim(df)[2];
+x = round(sqrt(kk),0);
+y = ceiling(kk/x);
+return(c(x,y))
+}
+par(mfrow = dimension(features_train))
+for(i in names(features_train)){
+    hist(features_train[[i]] ,main= i,xlab= "",col="#1DB954",label=TRUE,plot = TRUE)
+}
+```
+```{r, log transformation, include = FALSE  }
+#Log transform skewed variables:
+#Should log transform acousticness, instrumentalness, liveness, loudness
+#Check for 0 values in columns before transformation: 
+sum(features_train$acousticness == 0)
+sum(features_train$instrumentalness == 0)
+sum(features_train$liveness == 0)
+sum(features_train$loudness == 0)
+range(features_train$instrumentalness)
+#Instrumentalness has 0 values, which will not work with log transformation. Change 0 values in instrumentalness to 1 so that log transformation works. 
+features_train_log <- features_train %>%
+  mutate(
+  instrumentalness_log = case_when(
+    instrumentalness == 0.000 ~ 1,
+    TRUE          ~ instrumentalness
+    )
+  )
+sum(features_train_log$instrumentalness_log == 0)
+range(features_train_log$instrumentalness_log)
+#Loudness is negative, which causes issues with log transform
+features_train_log <- features_train %>%
+  mutate(
+  instrumentalness_log = case_when(
+    instrumentalness == 0.000 ~ 1,
+    TRUE          ~ instrumentalness
+    )
+  )
+#Log transform variables 
+features_train_log$instrumentalness_log = log10(features_train_log$instrumentalness_log)
+range(features_train_log$instrumentalness_log)
+features_train_log$acousticness_log = log10(features_train_log$acousticness)
+features_train_log$liveness_log = log10(features_train_log$liveness)
+features_train_log$loudness_log = log10(features_train_log$loudness)
+summary(features_train_log)
+```
+Finally, as part of the exploratory data analysis, we looked at the relationship between our independent variable (danceability) and our dependent variable (track popularity). There does not appear to be any significant clustering between our two variables of interest. 
+
+```{r danceability relationship scatter plot, out.width = "70%", echo = FALSE}
+danceability_popularity_relationship <- features_train %>%
+  ggplot(aes(x = danceability, y = track_popularity)) +
+  geom_point() + 
+  labs(
+    title = "Relationship of Danceability to Track Popularity",
+    x = "Danceability Score",
+    y = "track popularity"
+  )
+danceability_popularity_relationship
+```
+
+## 2.3 Research Design
+
+Our aim is to understand the relationship between the danceability metric and track popularity score. We will focus on danceability as the main independent variable of interest. For further analysis we will also investigate how the following audio features (variables) will also affect track popularity:
+
+- Energy
+- Valence
+- Accousticness
+- Instrumentalness
+- Key
+- Liveness
+- Loudness
+- Mode
+
+We hypothesize that danceability will influence a song’s track popularity score. Our approach is to start with a danceability conceptual “short” model and create two additional models to determine the best fit model for validating our explanatory analysis. The two other models will consist of Model 2  a control model,  Model 3 a full or best fit model, which contains all included metrics in the previously described audio features table. This approach will be sequential and built to each model to limit the risk of p-hacking and overfitting. More details of each model will be covered in the following model section.  Additionally, the details of which variables were omitted will be described in the omitted variables section 5.2.
+
+As this research is being conducted without specific domain knowledge of Spotify or the music industry, the research will be conducted in two steps:
+
+Step 1:  A sequential model approach for 3 models
+
+Step 2:  An exploration and testing data set 
+
+Each model will retain the track popularity metric as the outcome variable. The sequential model approach will go through:
+
+1. Model 1 - A danceability conceptual model will be used to verify danceability as an independent variable connected to the dependent variable track popularity.   
+
+2. Model 2 - A control model will be used to identify other features related to danceability, based on conceptual understanding of the danceability metric (such as energy and valence variables).
+
+3. An exploration process to build model 3 included an exploratory process to validate the coefficient values of each audio feature included in the data set, excluding omitted variables:
+
+- Testing violations (i.e discovered loudness to be incorrectly included)
+- Look at correlation matrix (to validate that there weren't more right hand errors)
+- Conceptual models (re-reviewed features and identified that we should remove key because of ordinal value (12 scale)
+- Checked the coefficients to confirm statistical significance and variable “power”
+
+4. Model 3 - A full model that will be used from the exploration process to validate the best fit model of the variance (R2).
+
+An exploration and testing data set will be created before research and model creation to validate the learnings from each of the models and help identify any potential issues or mistaken violations in the approach of this research (IDD, conceptual model, p-hacking, and/or overfitting). This train and test will also preserve IDDs and ensure there is  no violation of "stopping rules".
+
+# 3 Modeling
+
+## 3.1 Model 1 -  Danceability Conceptual (Short) Model
+
+In this first model, we are establishing the independent variable of danceability without covariates to test the main hypothesis.  How does the danceability score for a Spotify song affect its track popularity?
+
+\begin{quote}
+  \textit{Track Popularity = $\beta_{0}$ + $\beta_{1}$danceability}
+\end{quote}
+
+Based on the results, we determined that danceability has a 24.815 relationship to track popularity which signifies a 0.036 adjusted R2, indicating that 3.6% of the variance in track popularity (outcome variable) is being described in the conceptual short model.
+
+## 3.2 Model 2 - Danceability Control Model
+
+In Model 2 we adjust the model to ensure we are not inflating the results in Model 1 by adding additional explanatory variables related to danceability. The creation of this new conceptual model is to start with a theoretical approach to ensure no overfitting or bias in relation to the model. The two added variables are energy and valence.
+
+
+\begin{quote}
+  \textit{Track Popularity = $\beta_{0}$ + $\beta_{1}$danceability +  $\beta_{2}$energy + $\beta_{3}$valence}
+\end{quote}
+
+These two variables are selected based on the definitions and the conceptual approach that these two covariates would have a strong relationship to the danceability metric. For example, a high energy or a more positive sounding song may be more likely to have a change to the track popularity and would have an inflation effect on danceability if excluded.
+
+## 3.3 Model 3 - Full and best fit Model (Long Model) 
+
+In model 3, we add non-omitted variables. To test and validate our previous models, non-omitted values are included to confirm accuracy of the conceptual model and to check for any further potential inflation of results. Note that mode is an ordinal (binary) metric, thus factor was utilized within the model so that this variable is not treated as a continuous metric. 
+
+\begin{quote}
+  \textit{Track Popularity = $\beta_{0}$ + $\beta_{1}$danceability +  $\beta_{2}$energy + $\beta_{3}$valence + $\beta_{4}$acoustincness + $\beta_{5}$instrumentalness + $\beta_{6}$liveness + factor$\beta_{8}$ mode}
+\end{quote}
+
+# 4 Results
+The results of the three models are as follows: 
+
+```{r, model building, echo=FALSE, warning = FALSE, message = FALSE, results = 'asis'}
+#Short/conceptual Model: 
+model_1 <- lm(track_popularity ~ danceability, data = features_train)
+
+#Control for Danceability (hypothesize that energy and valence are related)
+model_2 <- lm(track_popularity ~ danceability + energy + valence, data = features_train)
+
+#Exploratory Sub model 2, looking at energy alone
+model_2_2 <- lm(track_popularity ~ danceability + energy, data = features_train)
+
+#Exploratory Model_3 drop valence
+model_3 <- lm(track_popularity ~ danceability + acousticness + energy + instrumentalness + liveness + loudness + factor(mode), data = features_train)
+
+#Exploratory Model_4 full/long  model; shoudln't include loudness
+model_4 <- lm(track_popularity ~ danceability + acousticness + energy + instrumentalness + key + liveness + loudness + factor(mode) + valence, data = features_train)
+
+#Correct Full/Long Model (referred to as model 3 in write-up)
+model_4.5 <- lm(track_popularity ~ danceability + acousticness + energy + instrumentalness + liveness + factor(mode) + valence, data = features_train)
+
+stargazer(
+  model_1, model_2, model_4.5,
+  type = "latex", 
+  header = FALSE,
+  se = list(get_robust_se(model_1), get_robust_se(model_2), get_robust_se(model_4.5)),
+  star.cutoffs = c(0.05, 0.01, 0.001))
+```
+
+In all three models we see a relevant significance of danceability as an explanatory variable to the outcome variable track popularity. Therefore, we will approach model selection by determining the best fit model (as defined by R2 value) that represents the most explanatory coefficients and statistical significance.
+
+Looking at the conceptual model 1 and control model 2, both have strong statistical significance of p <.001. Model 2 also has a stronger explanatory power (0.042 adjusted R2) than Model 1 (0.036).  However, based on the results provided, model 3 suggests an inflation of the danceability variable for model 1 and 2 since the scores of the coefficient decrease from Model 1 (24.815) and Model 2 (27.319) to Model 3 (22.075).
+
+Model 3 has a higher explanatory power with an adjusted R2 value of 0.047 compared to model 1’s (0.036) and model 2’s (0.042).  Although model 3’s p-value has a higher p value and thus lower statistical significance compared to the other 2 models, we suggest that model 3’s practical significance is stronger. Model 1 and model 2 are inflating the effect size of danceability due to the missing coefficients causing the danceability coefficient to move away from zero.   
+   
+With model 3 being the best fit the following would be true:
+
+1. Overall .047 for R2 or 4.7% of variance explained.
+2. Model 3 corrects danceability inflation. The effect size of danceability is 22.075, indicating that a one unit increase in danceability score increases the track popularity by 22.075 units. Interestingly, all other audio features except for energy are a negative relationship, implying that model 3 shows the more accurate coefficient relationship by likely reducing overinflation.
+3. An increase of 2.21 on a scale of 0-100 for track popularity for each .10 unit increase in danceability (scale 0-1) is non-trivial, suggesting that danceability does have an effect on track popularity. In other words if a song had a max score of 1 for danceability, it would result in ~22 points in track popularity.
+
+Notably, only one other feature (instrumentalness) reached statistical significance with a contribution of -0.9 in track popularity score for each .10 increase in instrumentalness score. This intuitively makes sense as most popular songs today contain some singing from an artist and a purely instrumental song would seem to be less likely to be popular.
+
+Looking at the danceability variable, it accurately predicts track popularity with about a 22.551 error on average.  More precisely, we can say that 68% of the predicted track popularity will be within 22.551 of the real values.
+
+Overall we find the model to be relevant with danceability being an explanatory variable to track popularity.  Danceability effect size changes with each model we evaluated but it remains the highest effect size in all models.  Adding more coefficients provides more accuracy to the danceability effect size while maintaining the statistical significance. The explanatory variable is 4.7% or R2 0.047 as described by danceability. It is important to note that the intercept coefficient is high (29.969) in Model 3, meaning if all explanatory variables in the model equal zero, there would be a mean track popularity score of ~30. This suggests that there are important variables related to track popularity that are not included in the best-fit model. These other variables are described below in the limitations and omitted variables section. However, for the purpose of this analysis, due to the interest of Spotify looking to understand a predictor of what songs to recommend and/or play to maintain engagement of users, these results suggest the importance of leveraging danceability in predicting track popularity. 
+
+Reproducibility
+As stated above, the cleansed dataset was randomly split into an exploratory subset of 339 samples (represented in the analysis above) and a testing subset of 146. Testing Model 3 on the test subset for reproducibility did not result in significance for any of the variables except for instrumentalness (coefficient of -10.226). The danceability coefficient was 7.220 in this test set, but did not reach significance. Thus, we were unable to reproduce Model 3 outcomes in this smaller testing subset.  
+
+
+# 5 Model Limitations
+
+## 5.1 Large Sample Assumptions
+
+1. Independent and Identically Distributed (I.I.D.) Data:
+
+The data we are working with satisfies I.I.D. because the randomized form of gathering the tracks allowed our data to be independent of each other. By ensuring that there were no duplicate track ids and using the randify web application we were able to satisfy the I.I.D assumption.
+
+2. Unique BLP Exists:
+
+To assess whether a unique BLP exists we must first check that there is no perfect collinearity. Our correlation matrix below indicates that there is no perfect collinearity:
+
+```{r fig.width=12, fig.height=12, echo=FALSE}
+#Coefficient correlation matrix option #1 
+#kp_cols funciton obtained from: https://github.com/walkerkq/kp_themes/blob/master/theme_kp.R
+kp_cols <- function(...) {
+  
+  kp_colors <- c(purple = "#490B32",
+                 red = "#9A031E",
+                 orange = "#FB8B24",
+                 dark_orange = "#E36414",
+                 dark_blue = "#0F4C5C",
+                 grey = "#66717E",
+                 light_green = "#1DB954",
+                 blue = "#5DA9E9"
+  )
+  
+  cols <- c(...)
+  
+  if (is.null(cols))
+    return (kp_colors)
+  
+  kp_colors[cols]
+}
+#Correlation matrix code obtained from: https://www.kaylinpavlik.com/classifying-songs-genres/
+features_train %>%
+  scale() %>%
+  cor() %>%
+  corrplot::corrplot(method = 'color', 
+                     order = 'hclust', 
+                     type = 'upper', 
+                     diag = FALSE, 
+                     tl.col = 'black',
+                     addCoef.col = "grey30",
+                     number.cex = 1,
+                     col = colorRampPalette(colors = c(
+                       kp_cols('dark_blue'), 
+                       'white', 
+                       kp_cols('light_green')))(200),
+                     main = 'Audio Feature Correlation',
+                     mar = c(2,2,2,2))
+```
+
+
+
+## 5.2 Structural Limitations - Ommitted Variables
+
+Through our research and reviewing the data we identified a few variables that needed to be omitted that could conceptually impact results of the model. The ommitted variables are outlined in the causal diagram below:
+
+![](diagram){width=70%}
+
+#### Intentional Ommitted Variables:
+\
+
+1. Duration & Speechiness:
+
+Duration and Speechiness were utilized as a filter in the data cleansing process. Since speechiness measures the spoken words within the track and not necessarily singing, we felt this variable was not relevant to songs. For song duration, we filtered out outliers and the final distribution of song duration seems consistent with standard songs. Conceptually, it is challenging to justify that a longer song would be more popular over a shorter song, thus we did not think it was a relevant variable to include in the model. 
+
+2. Tempo, Loudness, & Time Signature:
+
+We chose to omit these variables because they related to closely to the energy metric. If these were to be included in the model, it would result in a right hand side error, potentially complicating the model outcome interpretation.
+
+3. Artist Popularity:
+
+We recognize that Artists that have a larger following will likely have a higher track popularity score for their songs. Thus, the artist popularity would be an important variable to consider in a model. Spotify API does provide the Artist Popularity score for each song by the artist, however, we found that the Track Popularity metric uses the Artist Popularity score in the calculation. Including the Artist Popularity variable would cause a reverse causality violation so this was intentionally omitted.  
+
+#### Unintentional Ommitted Variable:
+
+1. Track Genre:
+
+Track Genre was a variable missing in the Spotify API that would anticipate making an impact on the model. However, Track Genre is not an available song feature within the Spotify API. Top 100 tracks in the US on Spotify tend to consist of Pop, Rap and R&B songs as opposed to Folk or Jazz genres, so this could be introducing an appreciable omitted variable bias into our model. If the track genre is Pop, Rap or R&B this could have resulted in a higher track popularity, thus this omitted variable bias is positive / away from zero.
+
+2. Reccomender Algorithms:
+
+Spotify uses many ways to recommend songs to users, for instance it suggests newly released tracks from artists the user listens to, it creates albums curated to the user's specific genres of music they enjoy, and it even provides a "hits" only section that enables users to only listen to popular tracks. How this algorithm impacts a song is not a feature that is included in the Spotify API. This recommender algorithm would introduce bias due to users not being exposed to songs in a randomized manner. Thus, songs may have a lower or higher track popularity score based on the impact of the algorithm.  
+
+
+# 6 Conclusions 
+
+The goal of this analysis was to understand the relationship between a song’s danceability score and the track popularity in Spotify. We obtained song features from the Spotify API for a random sample of songs in order to address this research question. After data filtering and ensuring independence in our dataset, the number of samples in the final dataset was 485. This final dataset was randomly split into an exploratory subset of 339 samples and a testing subset of 146. 
+
+After building three models in the exploratory subset, we conclude that the track popularity is impacted by the danceability score in Spotify with an increase in a song’s danceability by .10 units resulting in an increase of the track popularity by 2.21 units, with all other features being equal. The best fit model (Model 3) included all reasonable ordinal/continuous song features, but only one other feature (instrumentalness) reached statistical significance. Notably, the intercept of the model was high, indicating that there may be other features impacting track popularity that are not represented in this model. 
+
+After identifying Model 3 as the best fit model, we re-ran it utilizing the smaller test subset containing 146 songs randomly sequestered from the original cleansed dataset. We were unable to reproduce the outcomes of Model 3 on this subsequent test set. We hypothesize that the lack of reaching significance in the test set is a result of a small dataset. Rather than violate “stopping rules” to add more data to the test set, we recommend that this research design be redone using a larger sample size to determine confidence in reproducibility. 
+
+In addition to being unable to be reproduced, based on conceptual knowledge of the music industry, Model 3 is likely missing important features such as the artist’s popularity and the genre of the music that would have a significant impact in the track popularity. However, it would still be of interest for Spotify to consider the role of the danceability metric when optimizing for track streams. Based on this analysis, songs having higher danceability scores would be more likely to be popular with all else being equal. 
+
+This analysis suggests that the danceability score for a song plays an appreciable role in the track popularity score. While this could be utilized by stakeholders at Spotify to further optimize song recommendations to encourage increasing streams, there are limitations to this analysis. Future analyses would benefit from incorporating additional variables related to the artist’s popularity and the song genre and controlling for the impact of the recommender algorithms, which would introduce further robustness to a model. 
+
+```{r, looking at log transformation on dependent variable, include=FALSE}
+#extra analysis
+model_log <- lm(log(track_popularity) ~ danceability + acousticness + energy + instrumentalness + liveness + factor(mode) + valence, data = features_train)
+#Model 5 only looking at energy related to track popularity 
+#model_5 <- lm(track_popularity ~ danceability + energy, data = features_train)
+#summary(model_test)
+stargazer(
+   model_4.5, model_log,
+   type = "text", 
+   se = list(get_robust_se(model_4.5), get_robust_se(model_log)),
+  star.cutoffs = c(0.05, 0.01, 0.001))
+```
+```{r, look at effect of log transformation on track popularity, include =FALSE}
+danceability_coef <- round(coef(model_log)['danceability'], 3)
+danceability_effect <- exp(danceability_coef)
+danceability_effect <- round((danceability_effect -1)*100, digits = 2)
+```
+
+```{r code and plots assessing normally distributed errors, include = FALSE}
+model_resid = resid(model_4.5)
+plot_one <- model_4.5 %>% 
+  ggplot(aes(x = model_resid)) + 
+  labs(title = "Histogram of model_3 residuals") + 
+  geom_histogram()
+  
+plot_two <- model_4.5 %>% 
+  ggplot(aes(sample = model_resid)) +
+  labs(title = "Q-Q plot of model_3 residuals") + 
+  stat_qq() + stat_qq_line()
+
+plot_one / plot_two
+```
+
+```{r code and plots assessing error variance, include = FALSE}
+
+plot(model_4.5, which=3)
+```
+```{r, plot of model predictions vs residuals, include = FALSE}
+features_train %>% 
+  mutate(
+    model_predict = predict(model_4.5), 
+    model_resid = resid(model_4.5)
+  ) %>% 
+  ggplot(aes(model_predict, model_resid)) + 
+  labs(title = "Predicted Outcome vs Residuals of Model_3") + 
+  geom_point() + 
+  stat_smooth()
+
+```
+# 7 References
+
+1. https://s22.q4cdn.com/540910603/files/doc_financials/2021/q4/0307a021-254e-43c5-aeac-8242b0ea3ade.pdf
+2. https://www.digitalmusicnews.com/2019/01/18/streaming-music-shorter-songs-study/ 
+
+
+

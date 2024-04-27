@@ -1,0 +1,542 @@
+---
+title: "saniya_exploration"
+output: html_document
+date: '2022-03-30'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+```
+
+```{r, correlation plot package}
+install.packages('corrplot')
+```
+
+```{r}
+library(readr)
+library(ggplot2)
+library(tidyverse)
+library(corrplot)
+library(stargazer)
+library(sandwich)
+library(lmtest)
+library(patchwork)
+library(car)
+```
+```{r source functions from project, echo = FALSE}
+source('./src/get_robust_se.R')
+```
+## R Markdown
+
+```{r data, include = FALSE}
+#Exploration dataset
+spotify_data <- read_csv("spotify_data.csv")
+View(spotify_data)
+```
+
+```{r}
+glimpse(spotify_data)
+```
+
+## Initial cleaning
+Free of duplicate rows/values (track ID checks)
+Error-free (e.g. free of misspellings)
+Relevant (e.g. free of special characters)
+The appropriate data type for analysis
+Free of outliers (or only contain outliers have been identified/understood)
+
+Spotify description of track features: https://developer.spotify.com/documentation/web-api/reference/#/operations/get-audio-features
+
+```{r, exploratory dataset cleaning}
+#First, get original sample size:
+nrows_original <- nrow(spotify_data)
+#track id is unique for each song on Spotify. Will use the id field to determine if any repeated songs are present: 
+track_id_freq <- data.frame(table(spotify_data$id))
+track_id_freq[track_id_freq$Freq > 1,]
+#There are no repeated track ids in the dataset. 
+#Next, check for na values: 
+sapply(spotify_data, function(x) sum(is.na(x)))
+#There are no na values present in the dataframe
+#Next, need to check the reliability/validity of each variable. Check for correct format, check for range if numeric. 
+# Track id: Per Spotify, should be 22 characters (alphanumeric)
+sum(nchar(as.character(spotify_data$id)) != 22)
+#All track IDs are 22 characters long. 
+#There may be repeated versions of songs (same song name and artist, different track number). Will check for repeated artist/song combos: 
+table(duplicated(spotify_data[c("artist_name", "track_name")]))
+#There are no repeated artist/combinations in the dataset. 
+#Looking at expected ranges for the numeric variables in the dataset.
+variable_ranges <- data.frame(min=sapply(spotify_data,min),max=sapply(spotify_data,max))
+rows_to_remove <- c("analysis_url", "artist_name", "id", "track_href", "track_name", "type", "uri")
+variable_ranges <- variable_ranges[!(row.names(variable_ranges) %in% rows_to_remove),]
+view(variable_ranges)
+#All numeric variables appear to be in the expected ranges per the spotify documentation: https://developer.spotify.com/documentation/web-api/reference/#/operations/get-audio-features
+#Speechiness- are there tracks that are only spoken? We should consider removing these. Values above .66 describe tracks that are likely to be fully spoken. 
+high_speechiness_songs <- spotify_data[spotify_data$speechiness > .66,]
+nrows_high_speechiness <- nrow(high_speechiness_songs)
+#Drop the high speech songs, these appear to be audio book chapters.
+spotify_data <- spotify_data[which(spotify_data$speechiness <= .66),]
+#16 high speechiness songs have been removed. 
+#Look at song length; convert first to minutes; milliseconds ÷ 60,000 = Min
+spotify_data <- spotify_data %>%
+  mutate(
+  length_min = (duration_ms/60000)
+  )
+length_histogram <- spotify_data%>%
+  ggplot() +
+  aes(x= length_min) +
+  geom_histogram(bins=30)  + 
+  labs(
+    title = "Histogram of Song Length",
+    x = "Song Length (min)",
+    y = "Count"
+  ) 
+range(spotify_data$length_min)
+#The interquartile range (IQR) is the difference between the 75th percentile (Q3) and the 25th percentile (Q1) in a dataset. It measures the spread of the middle 50% of values.
+#You could define an observation to be an outlier if it is 1.5 times the interquartile range greater than the third quartile (Q3) or 1.5 times the interquartile range less than the first quartile (Q1).
+#Song length quartiles: 
+Q1 <- quantile(spotify_data$length_min, .25)
+Q3 <- quantile(spotify_data$length_min, .75)
+IQR <- IQR(spotify_data$length_min)
+spotify_data_no_outliers <- subset(spotify_data, spotify_data$length_min> (Q1 - 1.5*IQR) & spotify_data$length_min< (Q3 + 1.5*IQR))
+nrows_remove_outliers <- (nrow(spotify_data) - nrow(spotify_data_no_outliers))
+#35 outlier songs removed
+length_histogram_no_outliers <- spotify_data_no_outliers%>%
+  ggplot() +
+  aes(x= length_min) +
+  geom_histogram(bins=30)  + 
+  labs(
+    title = "Histogram of Song Length",
+    x = "Song Length (min)",
+    y = "Count"
+  ) 
+length_histogram
+length_histogram_no_outliers
+summary(spotify_data_no_outliers$length_min)
+#Remaining data is 48 seconds to 6.11 min, which seems to encompass the length of typical songs. Note that the average song length is ~3.5 min, so this dataset seems representative of typical songs. 
+#Drop these 0 popularity scores. Justification is that track popularity is calculated based on number of plays. With a 0 score, the songs have not been played. 
+zero_popularity <- spotify_data_no_outliers[spotify_data_no_outliers$track_popularity == 0,]
+nrows_zero_popularity <- nrow(zero_popularity)
+spotify_data_final <- spotify_data_no_outliers[which(spotify_data_no_outliers$track_popularity > 0),]
+nrows_spotify_data_final <- nrow(spotify_data_final)
+```
+
+```{r dataset summary table after cleaning, echo = FALSE}
+#Summary table for exploratory dataset
+data_set <- data.frame(
+   Description = c("Original", 
+                   "Dropped non-songs",
+                   "Dropped video length outliers",
+                   "Dropped videos with no plays",
+                   "Final dataset size"), 
+   Counts = c(nrows_original, nrows_high_speechiness, nrows_remove_outliers, nrows_zero_popularity, nrows_spotify_data_final))
+kable(data_set)
+```
+
+```{r training dataset cleaning}
+#Cleaning the training dataset
+spotify_data_train <- read_csv("spotify_data_2.csv")
+#First, get original sample size:
+nrows_original_train <- nrow(spotify_data_train)
+#track id is unique for each song on Spotify. Will use the id field to determine if any repeated songs are present: 
+track_id_freq_train <- data.frame(table(spotify_data_train$id))
+track_id_freq_train[track_id_freq_train$Freq > 1,]
+dim(track_id_freq_train)
+#There are no repeated track ids in the dataset. 
+#Next, check for na values: 
+sapply(spotify_data_train, function(x) sum(is.na(x)))
+#There are no na/missing values present in the dataframe
+#Next, need to check the reliability/validity of each variable. Check for correct format, check for range if numeric. 
+# Track id: Per Spotify, should be 22 characters (alphanumeric)
+sum(nchar(as.character(spotify_data_train$id)) != 22)
+#All track IDs are 22 characters long. 
+#There may be repeated versions of songs (same song name and artist, different track number). Will check for repeated artist/song combos: 
+table(duplicated(spotify_data_train[c("artist_name", "track_name")]))
+#There are no repeated artist/combinations in the dataset. 
+#Verify if there are any shared track ids between the exploration dataset and the train dataset: 
+duplicates <- spotify_data_train$id[spotify_data_train$id %in% spotify_data$id]
+spotify_data_train <- spotify_data_train[!(spotify_data_train$id == duplicates),]
+nrows_remove_testing_duplicates <- length(duplicates)
+nrows_remove_testing_duplicates
+#There appears to be 1 shared id, removed duplicates.  
+#Looking at expected ranges for the numeric variables in the dataset.
+variable_ranges_train <- data.frame(min=sapply(spotify_data_train,min),max=sapply(spotify_data_train,max))
+rows_to_remove <- c("analysis_url", "artist_name", "id", "track_href", "track_name", "type", "uri")
+variable_ranges_train <- variable_ranges_train[!(row.names(variable_ranges_train) %in% rows_to_remove),]
+view(variable_ranges_train)
+#All numeric variables appear to be in the expected ranges per the spotify documentation: https://developer.spotify.com/documentation/web-api/reference/#/operations/get-audio-features
+#Speechiness- are there tracks that are only spoken? We should consider removing these. Values above .66 describe tracks that are likely to be fully spoken. 
+high_speechiness_songs_train <- spotify_data_train[spotify_data_train$speechiness > .66,]
+nrows_high_speechiness_train <- nrow(high_speechiness_songs_train)
+#Drop the high speech songs, these appear to be audio book chapters.
+spotify_data_train <- spotify_data_train[which(spotify_data_train$speechiness <= .66),]
+#11 high speechiness songs have been removed. 
+#Convert song length to mintues; milliseconds ÷ 60,000 = Min
+spotify_data_train <- spotify_data_train %>%
+  mutate(
+  length_min = (duration_ms/60000)
+  )
+range(spotify_data_train$length_min)
+#The interquartile range (IQR) is the difference between the 75th percentile (Q3) and the 25th percentile (Q1) in a dataset. It measures the spread of the middle 50% of values.
+#You could define an observation to be an outlier if it is 1.5 times the interquartile range greater than the third quartile (Q3) or 1.5 times the interquartile range less than the first quartile (Q1).
+#Song length quartiles: 
+Q1 <- quantile(spotify_data_train$length_min, .25)
+Q3 <- quantile(spotify_data_train$length_min, .75)
+IQR <- IQR(spotify_data_train$length_min)
+spotify_data_train_no_outliers <- subset(spotify_data_train, spotify_data_train$length_min> (Q1 - 1.5*IQR) & spotify_data_train$length_min< (Q3 + 1.5*IQR))
+nrows_remove_outliers_train <- (nrow(spotify_data_train) - nrow(spotify_data_train_no_outliers))
+#21 outlier song lengths removed
+summary(spotify_data_train_no_outliers$length_min)
+#Remaining data is 1 min to 6.18 min, which is very similar to the test set. Note that the average song length is ~3.5 min, so this dataset seems representative of typical songs. 
+#Drop these 0 popularity scores. Justification is that track popularity is calculated based on number of plays. With a 0 score, the songs have not been played. 
+zero_popularity_train <- spotify_data_train_no_outliers[spotify_data_train_no_outliers$track_popularity == 0,]
+nrows_zero_popularity_train <- nrow(zero_popularity_train)
+spotify_data_train_final <- spotify_data_train_no_outliers[which(spotify_data_train_no_outliers$track_popularity > 0),]
+nrows_spotify_data_train_final <- nrow(spotify_data_train_final)
+```
+
+```{r dataset summary table after cleaning, echo = FALSE}
+#Summary table for testing dataset
+data_set_train <- data.frame(
+   Description = c("Original", 
+                   "Duplicates with exploratory dataset",
+                   "Dropped non-songs",
+                   "Dropped video length outliers",
+                   "Dropped videos with no plays",
+                   "Final dataset size"), 
+   Counts = c(nrows_original_train, nrows_remove_testing_duplicates, nrows_high_speechiness_train, nrows_remove_outliers_train, nrows_zero_popularity_train, nrows_spotify_data_train_final))
+kable(data_set_train)
+```
+
+
+
+
+
+
+
+
+
+
+--------------------------------------------------------- Added by Saniya ---------------------------------------
+
+```{r data, include = FALSE}
+#Exploration dataset
+spotify_data_1 <- read_csv("spotify_data.csv")
+spotify_data_2 <- read_csv("spotify_data_2.csv")
+spotify_data <- rbind(spotify_data_1,spotify_data_2)
+View(spotify_data)
+```
+
+```{r}
+glimpse(spotify_data)
+```
+
+```{r combined dataset}
+#First, get original sample size:
+nrows_original <- nrow(spotify_data)
+#track id is unique for each song on Spotify. Will use the id field to determine if any repeated songs are present: 
+track_id_freq <- data.frame(table(spotify_data$id))
+track_id_freq[track_id_freq$Freq > 1,]
+#There are no repeated track ids in the dataset. 
+#Next, check for na values: 
+sapply(spotify_data, function(x) sum(is.na(x)))
+#There are no na values present in the dataframe
+#Next, need to check the reliability/validity of each variable. Check for correct format, check for range if numeric. 
+# Track id: Per Spotify, should be 22 characters (alphanumeric)
+sum(nchar(as.character(spotify_data$id)) != 22)
+#All track IDs are 22 characters long. 
+#There may be repeated versions of songs (same song name and artist, different track number). Will check for repeated artist/song combos: 
+table(duplicated(spotify_data[c("artist_name", "track_name")]))
+#There are no repeated artist/combinations in the dataset. 
+#Looking at expected ranges for the numeric variables in the dataset.
+variable_ranges <- data.frame(min=sapply(spotify_data,min),max=sapply(spotify_data,max))
+rows_to_remove <- c("analysis_url", "artist_name", "id", "track_href", "track_name", "type", "uri")
+variable_ranges <- variable_ranges[!(row.names(variable_ranges) %in% rows_to_remove),]
+view(variable_ranges)
+#All numeric variables appear to be in the expected ranges per the spotify documentation: https://developer.spotify.com/documentation/web-api/reference/#/operations/get-audio-features
+#Speechiness- are there tracks that are only spoken? We should consider removing these. Values above .66 describe tracks that are likely to be fully spoken. 
+high_speechiness_songs <- spotify_data[spotify_data$speechiness > .66,]
+nrows_high_speechiness <- nrow(high_speechiness_songs)
+#Drop the high speech songs, these appear to be audio book chapters.
+spotify_data <- spotify_data[which(spotify_data$speechiness <= .66),]
+#16 high speechiness songs have been removed. 
+#Look at song length; convert first to minutes; milliseconds ÷ 60,000 = Min
+spotify_data <- spotify_data %>%
+  mutate(
+  length_min = (duration_ms/60000)
+  )
+length_histogram <- spotify_data%>%
+  ggplot() +
+  aes(x= length_min) +
+  geom_histogram(bins=30)  + 
+  labs(
+    title = "Histogram of Song Length",
+    x = "Song Length (min)",
+    y = "Count"
+  ) 
+range(spotify_data$length_min)
+#The interquartile range (IQR) is the difference between the 75th percentile (Q3) and the 25th percentile (Q1) in a dataset. It measures the spread of the middle 50% of values.
+#You could define an observation to be an outlier if it is 1.5 times the interquartile range greater than the third quartile (Q3) or 1.5 times the interquartile range less than the first quartile (Q1).
+#Song length quartiles: 
+Q1 <- quantile(spotify_data$length_min, .25)
+Q3 <- quantile(spotify_data$length_min, .75)
+IQR <- IQR(spotify_data$length_min)
+spotify_data_no_outliers <- subset(spotify_data, spotify_data$length_min> (Q1 - 1.5*IQR) & spotify_data$length_min< (Q3 + 1.5*IQR))
+nrows_remove_outliers <- (nrow(spotify_data) - nrow(spotify_data_no_outliers))
+#35 outlier songs removed
+length_histogram_no_outliers <- spotify_data_no_outliers%>%
+  ggplot() +
+  aes(x= length_min) +
+  geom_histogram(bins=30)  + 
+  labs(
+    title = "Histogram of Song Length",
+    x = "Song Length (min)",
+    y = "Count"
+  ) 
+length_histogram
+length_histogram_no_outliers
+summary(spotify_data_no_outliers$length_min)
+#Remaining data is 48 seconds to 6.11 min, which seems to encompass the length of typical songs. Note that the average song length is ~3.5 min, so this dataset seems representative of typical songs. 
+#Drop these 0 popularity scores. Justification is that track popularity is calculated based on number of plays. With a 0 score, the songs have not been played. 
+zero_popularity <- spotify_data_no_outliers[spotify_data_no_outliers$track_popularity == 0,]
+nrows_zero_popularity <- nrow(zero_popularity)
+spotify_data_final <- spotify_data_no_outliers[which(spotify_data_no_outliers$track_popularity > 0),]
+nrows_spotify_data_final <- nrow(spotify_data_final)
+```
+
+```{r dataset summary table after cleaning, echo = FALSE}
+#Summary table for exploratory dataset
+data_set <- data.frame(
+   Description = c("Original", 
+                   "Dropped non-songs",
+                   "Dropped video length outliers",
+                   "Dropped videos with no plays",
+                   "Final dataset size"), 
+   Counts = c(nrows_original, nrows_high_speechiness, nrows_remove_outliers, nrows_zero_popularity, nrows_spotify_data_final))
+kable(data_set)
+```
+```{r}
+set.seed(1)
+dt = sort(sample(nrow(spotify_data_final), nrow(spotify_data_final)*.7))
+train <-spotify_data_final[dt,]
+test <-spotify_data_final[-dt,]
+nrow(train)
+nrow(test)
+```
+
+```{r}
+features_train <-  train[c('track_popularity','danceability', 'acousticness', 'energy', 'instrumentalness', 'liveness', 'loudness', 'mode', 'valence')]
+head(features_train)
+```
+
+```{r fig.width=8, fig.height=6}
+#Coefficient correlation matrix option #1 
+#kp_cols funciton obtained from: https://github.com/walkerkq/kp_themes/blob/master/theme_kp.R
+kp_cols <- function(...) {
+  
+  kp_colors <- c(purple = "#490B32",
+                 red = "#9A031E",
+                 orange = "#FB8B24",
+                 dark_orange = "#E36414",
+                 dark_blue = "#0F4C5C",
+                 grey = "#66717E",
+                 light_green = "#1DB954",
+                 blue = "#5DA9E9"
+  )
+  
+  cols <- c(...)
+  
+  if (is.null(cols))
+    return (kp_colors)
+  
+  kp_colors[cols]
+}
+#Correlation matrix code obtained from: https://www.kaylinpavlik.com/classifying-songs-genres/
+features_train %>%
+  #select() %>%
+  scale() %>%
+  cor() %>%
+  corrplot::corrplot(method = 'color', 
+                     order = 'hclust', 
+                     type = 'upper', 
+                     diag = FALSE, 
+                     tl.col = 'black',
+                     addCoef.col = "grey30",
+                     number.cex = 1,
+                     col = colorRampPalette(colors = c(
+                       kp_cols('dark_blue'), 
+                       'white', 
+                       kp_cols('light_green')))(200),
+                     main = 'Audio Feature Correlation',
+                     mar = c(2,2,2,2),
+                     family = 'Avenir')
+```
+```{r, fig.width=6, fig.height=6, include = FALSE}
+#Correlation Matrix option #2
+M = cor(features_train)
+corrplot(M, method = 'number')
+```
+
+```{r}
+#Short/conceptual Model: 
+model_1 <- lm(track_popularity ~ danceability, data = features_train)
+#Control for Danceability (hypothesize that energy and valence are related)
+model_2 <- lm(track_popularity ~ danceability + energy + valence, data = features_train)
+#Sub model 2, looking at energy alone
+#model_2_2 <- lm(track_popularity ~ danceability + energy, data = features_train)
+#Model_3 drop valence
+#model_3 <- lm(track_popularity ~ danceability + acousticness + energy + instrumentalness + liveness + loudness + factor(mode), data = features_train)
+#Model_4 full/long  model
+#model_4 <- lm(track_popularity ~ danceability + acousticness + energy + instrumentalness + key + liveness + loudness + factor(mode) + valence, data = features_train)
+model_3 <- lm(track_popularity ~ danceability + acousticness + energy + instrumentalness + liveness + factor(mode) + valence, data = features_train)
+#Model 5 only looking at energy related ot track popularity 
+#model_5 <- lm(track_popularity ~ danceability + energy, data = features_train)
+#summary(model_test)
+stargazer(
+   model_1, model_2, model_3,
+   type = "text", 
+   se = list(get_robust_se(model_1), get_robust_se(model_2), get_robust_se(model_3)),
+  star.cutoffs = c(0.05, 0.01, 0.001))
+```
+```{r}
+features_test <-  test[c('track_popularity','danceability', 'acousticness', 'energy', 'instrumentalness', 'liveness', 'loudness', 'mode', 'valence')]
+head(features_test)
+```
+
+```{r}
+#Short/conceptual Model: 
+model_1_test <- lm(track_popularity ~ danceability, data = features_test)
+model_2_test <- lm(track_popularity ~ danceability + energy + valence, data = features_test)
+model_3_test <- lm(track_popularity ~ danceability + acousticness + energy + instrumentalness + liveness + loudness + factor(mode), data = features_test)
+model_4.5_test <- lm(track_popularity ~ danceability + acousticness + energy + instrumentalness + liveness + factor(mode) + valence, data = features_test)
+
+stargazer(
+   model_1_test, model_2_test, model_3_test, model_4.5_test,
+   type = "text", 
+   se = list(get_robust_se(model_1_test), get_robust_se(model_2_test), get_robust_se(model_3_test), get_robust_se(model_4.5_test)),
+  star.cutoffs = c(0.05, 0.01, 0.001))
+```
+```{r}
+coef(model_4.5_test)
+vif(model_4.5_test, vcovHC)
+```
+
+
+```{r}
+features <-  spotify_data_final[c('track_popularity','danceability', 'acousticness', 'energy', 'instrumentalness', 'liveness', 'loudness', 'mode', 'valence')]
+head(features)
+```
+```{r}
+#Short/conceptual Model: 
+model_11 <- lm(track_popularity ~ danceability, data = features)
+model_22 <- lm(track_popularity ~ danceability + energy + valence, data = features)
+model_33 <- lm(track_popularity ~ danceability + acousticness + energy + instrumentalness + liveness + loudness + factor(mode), data = features)
+model_44 <- lm(track_popularity ~ danceability + acousticness + energy + instrumentalness + liveness + factor(mode) + valence, data = features)
+
+stargazer(
+   model_11, model_22, model_33, model_44,
+   type = "text", 
+   se = list(get_robust_se(model_11), get_robust_se(model_22), get_robust_se(model_33), get_robust_se(model_44)),
+  star.cutoffs = c(0.05, 0.01, 0.001))
+```
+
+
+```{r}
+vif(model_4.5, vcovHC)
+```
+```{r}
+coeftest(model_1, vcovHC)
+coeftest(model_4, vcovHC)
+```
+```{r fig.width=5, fig.height=4}
+#Side by side histograms for all metric variables: 
+dimension = function(df){
+kk = dim(df)[2];
+x = round(sqrt(kk),0);
+y = ceiling(kk/x);
+return(c(x,y))
+}
+par(mfrow = dimension(features_train))
+for(i in names(features_train)){
+    hist(features_train[[i]] ,main= i,xlab= "",col="#1DB954",label=TRUE,plot = TRUE)
+}
+```
+
+```{r, log transformation; first need to replace 0s. }
+#Log transform skewed variables:
+#Should log transform acousticness, instrumentalness, liveness, loudness
+#Check for 0 values in columns before transformation: 
+sum(features_train$acousticness == 0)
+sum(features_train$instrumentalness == 0)
+sum(features_train$liveness == 0)
+sum(features_train$loudness == 0)
+range(features_train$instrumentalness)
+#Instrumentalness has 0 values, which will not work with log transformation. Change 0 values in instrumentalness to 1 so that log transformation works. 
+features_train_log <- features_train %>%
+  mutate(
+  instrumentalness_log = case_when(
+    instrumentalness == 0.000 ~ 1,
+    TRUE          ~ instrumentalness
+    )
+  )
+sum(features_train_log$instrumentalness_log == 0)
+range(features_train_log$instrumentalness_log)
+#Loudness is negative, which causes issues with log transform
+features_train_log <- features_train %>%
+  mutate(
+  instrumentalness_log = case_when(
+    instrumentalness == 0.000 ~ 1,
+    TRUE          ~ instrumentalness
+    )
+  )
+#Log transform variables 
+features_train_log$instrumentalness_log = log10(features_train_log$instrumentalness_log)
+range(features_train_log$instrumentalness_log)
+features_train_log$acousticness_log = log10(features_train_log$acousticness)
+features_train_log$liveness_log = log10(features_train_log$liveness)
+features_train_log$loudness_log = log10(features_train_log$loudness)
+summary(features_train_log)
+```
+
+```{r, fig.width=5, fig.height=4}
+#Plot histograms with new log transforms
+#I don't think we should do any log transforms after looking at the histograms. The only ones that are normalized is the liveness log... and logging a decimal provides negative values... 
+par(mfrow = dimension(features_train_log))
+for(i in names(features_train_log)){
+    hist(features_train_log[[i]] ,main= i,xlab= "",col="#1DB954",label=TRUE,plot = TRUE)}
+```
+New Megan looking at data transformations/other plots: (as of 7pm PST Sunday night) 
+------------------------------------------------------
+```{r}
+model_log <- lm(log(track_popularity) ~ danceability + acousticness + energy + instrumentalness + liveness + factor(mode) + valence, data = features_train)
+#Model 5 only looking at energy related ot track popularity 
+#model_5 <- lm(track_popularity ~ danceability + energy, data = features_train)
+#summary(model_test)
+stargazer(
+   model_3, model_log,
+   type = "text", 
+   se = list(get_robust_se(model_3), get_robust_se(model_log)),
+  star.cutoffs = c(0.05, 0.01, 0.001))
+```
+```{r}
+danceability_effect <- exp(.764)
+danceability_effect <- round((danceability_effect-1)*100, digits = 2)
+danceability_effect
+```
+For every 1 unit increase in danceability, track popularity increases by ~115%? Not sure that this makes sense. 
+
+```{r code and plots assessing normally distributed errors, echo = FALSE}
+model_resid = resid(model_3)
+plot_one <- model_3 %>% 
+  ggplot(aes(x = model_resid)) + 
+  labs(title = "Histogram of model_3 residuals") + 
+  geom_histogram()
+  
+plot_two <- model_3 %>% 
+  ggplot(aes(sample = model_resid)) +
+  labs(title = "Q-Q plot of model_3 residuals") + 
+  stat_qq() + stat_qq_line()
+
+plot_one / plot_two
+```
+

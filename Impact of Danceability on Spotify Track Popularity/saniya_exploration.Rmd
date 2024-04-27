@@ -1,0 +1,79 @@
+---
+title: "saniya_exploration"
+output: html_document
+date: '2022-03-30'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readr)
+library(ggplot2)
+library(tidyverse)
+
+```
+
+
+## R Markdown
+
+```{r data}
+spotify_data <- read_csv("spotify_data.csv")
+View(spotify_data)
+```
+
+## Initial Plots
+
+```{r pressure, echo=FALSE}
+danceability_plot <- spotify_data%>%ggplot() + 
+  aes(x=danceability) + geom_histogram(bins=200) +
+  labs(x = "Danceability", y = "Count", title = "Histogram of Dancebility")
+popularity_plot <- spotify_data%>%ggplot() + 
+  aes(x= log10(track_popularity)) + geom_histogram(bins=150) +
+  labs(x = "Track Popularity", y = "Count", title = "Histogram of Track Popularity") 
+danceability_plot/popularity_plot
+## transform zeros to ones then run the log
+```
+```{r}
+ggplot(spotify_data, aes(x=danceability, y=log10(track_popularity))) + geom_point()+
+  geom_smooth(se = FALSE)+
+  labs(
+    title = "Track Popularity vs Dance Ability",
+    x = "Dance Ability",
+    y = "Track Popularity"
+  ) 
+```
+```{r}
+ggplot(spotify_data, aes(x=artist_popularity, y=log10(track_popularity))) + geom_point()+
+  geom_smooth(se = FALSE)+
+  labs(
+    title = "Artist Popularity vs Track Popularity",
+    x = "Artist Popularity",
+    y = "Track Popularity"
+  ) 
+```
+To asses IID we need to look into the sampling process. We used an application called randify that randomly selects songs from the spotify database and curates a playlist based on 50 songs. This randomization ensures IID. 
+
+IID no duplicates.
+```{r}
+nrow(spotify_data)
+dropped <- distinct(spotify_data, id, .keep_all = TRUE)
+
+nrow(dropped)
+```
+
+Unique BLP: 
+From the graph below we can see that this histogram does not have heavy tails.
+```{r}
+outcome_histogram <- spotify_data%>%mutate(cost_per_vote = danceability / log10(track_popularity)) %>%
+  ggplot() +
+  aes(x=log10(cost_per_vote)) +
+  geom_histogram(bins=50)  + 
+  labs(
+    title = "Histogram of Dancebility per Track Popularity",
+    x = "Dancebility per Track Popularity",
+    y = "Count"
+  ) 
+outcome_histogram
+```

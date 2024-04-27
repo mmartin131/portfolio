@@ -1,0 +1,5 @@
+﻿Feature Name:,Definition:,Included / Omitted 
+Track Popularity,Popularity of track calculated by # of plays the track has had and how recent they were played. (0-100),Included; outcome variable
+Danceability,"A 0-1 scale. Danceability describes how suitable a track is for dancing based on a combination of musical elements including tempo, rhythm stability, beat strength, and overall regularity. A value of 0.0 is least danceable and 1.0 is most danceable.",Included
+Acousticness,A 0-1 scale where closer to 1 means high confidence the track is acoustic.,Included
+Artist Popularity,Popularity of an artist from 0-100 where 100 is most popular.,"Omitted: Derived from track popularity metric and Spotify algorithm, resulting in reverse causality with track popularity metric."
