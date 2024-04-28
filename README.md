@@ -16,13 +16,13 @@
     * Tech stack: R, ggplot2, Linear Regression
     * [Project Report](https://github.com/mmartin131/portfolio/blob/main/Impact%20of%20Danceability%20on%20Spotify%20Track%20Popularity/Project_report_Lakka_Martin_Sandico.pdf)
 - [Optimizing Food Delivery Utilizing Graph Databases](https://github.com/mmartin131/portfolio/tree/main/Optimizing%20Food%20Delivery%20Utilizing%20Graph%20Databases)
-    * Summary: Given a business scenario, utilize data stored in PostgreSQL database to create a Neo4j graph database
+    * Summary: Group project utilizing data stored in PostgreSQL database to create a Neo4j graph database
     * Tech stack: SQL, Python, Neo4j, NumPy
     * [Project Presentation](https://github.com/mmartin131/portfolio/blob/main/Optimizing%20Food%20Delivery%20Utilizing%20Graph%20Databases/W205_%20The%20Future%20of%20Our%20Business%20is%20Local%20(Project%203)%20.pdf) 
-- [Image Classification of Skin Lesions]()
-    * Summary: Multi-class image classification project
+- [Image Classification of Skin Lesions](https://github.com/mmartin131/portfolio/tree/main/Skin%20Lesion%20Image%20Classification)
+    * Summary: Group Multi-class image classification project utilizing multiple machine learning methods
     * Tech stack: Python, Logistic Regression, K-nearest neighbors, Random Forest, Convolutional Neural Network, Tensorflow, Keras, Transfer learning with EfficientNet, Hyperparameter Tuning with Optuna, Sagemaker
-    * Project Report
+    * [Project Report](https://github.com/mmartin131/portfolio/blob/main/Skin%20Lesion%20Image%20Classification/Classifying%20Skin%20Lesions%20Final%20Report.pdf)
 - [Energy Consumption and Drought Relationship]()
     * Summary: 
     * Tech stack: Python, Pandas, Altair, Tableau
