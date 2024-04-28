@@ -8,15 +8,15 @@
     * Tech stack: Python
     * [Project Report](https://github.com/mmartin131/portfolio/blob/main/Garden_Planner/garden_planner_project_proposal.pdf)
 - [Analysis of Illegal Cheetah Trade](https://github.com/mmartin131/portfolio/tree/main/Analysis_of_Illegal_Cheetah_Trade)
-    * Summary: Group project  
+    * Summary: Group project utilizing Python and Pandas for exploratory data analysis  
     * Tech stack: Python, Pandas, Bokeh, Geopandas
     * [Project Report](https://github.com/mmartin131/portfolio/blob/main/Analysis_of_Illegal_Cheetah_Trade/Project_2_Diabes_Grimes_Martin_Final_Report.pdf)
 - [Impact of Danceability on Spotify Track Popularity](https://github.com/mmartin131/portfolio/tree/main/Impact%20of%20Danceability%20on%20Spotify%20Track%20Popularity) 
-    * Summary: 
+    * Summary: Group project using explanatory regression analysis in R
     * Tech stack: R, ggplot2, Linear Regression
-    * Project Report
+    * [Project Report](https://github.com/mmartin131/portfolio/blob/main/Impact%20of%20Danceability%20on%20Spotify%20Track%20Popularity/Project_report_Lakka_Martin_Sandico.pdf)
 - [Optimizing Food Delivery Utilizing Graph Databases]()
-    * Summary:  
+    * Summary: Given a business scenario, utilize data stored in PostgreSQL database to create a Neo4j graph database
     * Tech stack: SQL, Python, Neo4j, NumPy
     * Project Presentation 
 - [Image Classification of Skin Lesions]()
