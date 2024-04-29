@@ -20,16 +20,17 @@
     * Tech stack: SQL, Python, Neo4j, NumPy
     * [Project Presentation](https://github.com/mmartin131/portfolio/blob/main/Optimizing%20Food%20Delivery%20Utilizing%20Graph%20Databases/W205_%20The%20Future%20of%20Our%20Business%20is%20Local%20(Project%203)%20.pdf) 
 - [Image Classification of Skin Lesions](https://github.com/mmartin131/portfolio/tree/main/Skin%20Lesion%20Image%20Classification)
-    * Summary: Group Multi-class image classification project utilizing multiple machine learning methods
+    * Summary: Multi-class image classification group project utilizing multiple machine learning methods
     * Tech stack: Python, Logistic Regression, K-nearest neighbors, Random Forest, Convolutional Neural Network, Tensorflow, Keras, Transfer learning with EfficientNet, Hyperparameter Tuning with Optuna, Sagemaker
     * [Project Report](https://github.com/mmartin131/portfolio/blob/main/Skin%20Lesion%20Image%20Classification/Classifying%20Skin%20Lesions%20Final%20Report.pdf)
-- [Energy Consumption and Drought Relationship]()
-    * Summary: 
+- [Energy Consumption and Drought Relationship](https://github.com/mmartin131/portfolio/tree/main/Drought%20and%20Energy%20Consumption%20visualization)
+    * Summary: Group project creating interactive visualizations in Tableau and Altair
     * Tech stack: Python, Pandas, Altair, Tableau
-    * Project Website
+    * [Project Website](http://w209project.s3-website-us-east-1.amazonaws.com/index.html)
 - [Clarifying Care: Efficient & Effective Discharge Summaries]() 
-    * Summary: 
+    * Summary: Group capstone project for completion of UC Berkeley MIDS. Clarifying Care is a plug-in tool that quickly and effectively creates a patient-friendly discharge summary from electronic healthcare record data
     * Tech stack: Python, Pandas, Retrieval Augmented Generation with Langchain, Llama 2, Hugging Face, Streamlit
+    * [Project Website](https://www.clarifyingcare.com)
 - [Proposal for Generative AI Applications in a Clinical Testing Laboratory]()
     * Summary: 
 
