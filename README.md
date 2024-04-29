@@ -31,10 +31,11 @@
     * Summary: Group capstone project for completion of UC Berkeley MIDS. Clarifying Care is a plug-in tool that quickly and effectively creates a patient-friendly discharge summary from electronic healthcare record data
     * Tech stack: Python, Pandas, Retrieval Augmented Generation with Langchain, Llama 2, Hugging Face, Streamlit
     * [Project Website](https://www.clarifyingcare.com)
-- [Genetic Database Privacy Analysis ]()
+- [Genetic Database Privacy Analysis ](https://github.com/mmartin131/portfolio/tree/main/Privacy%20and%20Data%20Applications%20Summaries)
     * Summary: Review of privacy frameworks and re-identification risks in a public genetic database
-    * [Report]()
-- [Proposal for Generative AI Applications in a Clinical Testing Laboratory]()
+    * [Report](https://github.com/mmartin131/portfolio/blob/main/Privacy%20and%20Data%20Applications%20Summaries/Privacy%20Considerations%20in%20Genetic%20Databases%20Report.pdf)
+- [Proposal for Generative AI Applications in a Clinical Testing Laboratory](https://github.com/mmartin131/portfolio/tree/main/Privacy%20and%20Data%20Applications%20Summaries)
     * Summary: Review of implementing generative AI applications in a clinical laboratory setting
+    * [Report](https://github.com/mmartin131/portfolio/blob/main/Privacy%20and%20Data%20Applications%20Summaries/MMartin%20AI%20applications%20in%20a%20clinical%20genetics%20lab%20summary.pdf)
 
 
