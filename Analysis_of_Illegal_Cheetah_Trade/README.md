@@ -1,5 +1,6 @@
-# mids-w200-fall21-project2-Diabes_Grimes_Martin
-W200 group project 2 data analysis on illegal cheetah trade
+#Python programming group project: data analysis on illegal cheetah trade
+
+Team members: Chris Grimes, George Diabes, Megan Martin
 
 Dataset obtained from: https://data.mendeley.com/datasets/84k92j4n3y/2
 

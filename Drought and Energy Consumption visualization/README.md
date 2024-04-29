@@ -1,6 +1,6 @@
 Group project for Data Visualization final project. 
 
-Utilizing Tableau and Altair, created interactive visualations combining energy usage and drought monitor data. 
+Utilizing Tableau and Altair, created interactive visualizations combining energy usage and drought monitor data. 
 
 Project Team: Menaal Saeed, Megan Martin, Nico Lebovitz, Todd Keech
 
