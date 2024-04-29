@@ -27,7 +27,7 @@
     * Summary: Group project creating interactive visualizations in Tableau and Altair
     * Tech stack: Python, Pandas, Altair, Tableau
     * [Project Website](http://w209project.s3-website-us-east-1.amazonaws.com/index.html)
-- [Clarifying Care: Efficient & Effective Discharge Summaries]() 
+- [Clarifying Care: Efficient & Effective Discharge Summaries](https://github.com/mmartin131/portfolio/tree/main/Clarifying-Care) 
     * Summary: Group capstone project for completion of UC Berkeley MIDS. Clarifying Care is a plug-in tool that quickly and effectively creates a patient-friendly discharge summary from electronic healthcare record data
     * Tech stack: Python, Pandas, Retrieval Augmented Generation with Langchain, Llama 2, Hugging Face, Streamlit
     * [Project Website](https://www.clarifyingcare.com)
