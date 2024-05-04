@@ -8,7 +8,7 @@
     * Tech stack: Python, Pandas, Retrieval Augmented Generation with Langchain, Llama 2, Hugging Face, Streamlit
     * [Project Website](https://www.clarifyingcare.com)
 - [Image Classification of Skin Lesions](https://github.com/mmartin131/portfolio/tree/main/Skin%20Lesion%20Image%20Classification)
-    * Summary: Multi-class image classification group project utilizing multiple machine learning methods
+    * Summary: Group project utilizing machine learning for multi-class image classification
     * Tech stack: Python, Logistic Regression, K-nearest neighbors, Random Forest, Convolutional Neural Network, Tensorflow, Keras, Transfer learning with EfficientNet, Hyperparameter Tuning with Optuna, Sagemaker
     * [Project Report](https://github.com/mmartin131/portfolio/blob/main/Skin%20Lesion%20Image%20Classification/Classifying%20Skin%20Lesions%20Final%20Report.pdf)
 - [Optimizing Food Delivery Utilizing Graph Databases](https://github.com/mmartin131/portfolio/tree/main/Optimizing%20Food%20Delivery%20Utilizing%20Graph%20Databases)
@@ -22,7 +22,7 @@
 - [Energy Consumption and Drought Relationship](https://github.com/mmartin131/portfolio/tree/main/Drought%20and%20Energy%20Consumption%20visualization)
     * Summary: Group project creating interactive visualizations in Tableau and Altair
     * Tech stack: Python, Pandas, Altair, Tableau
-    * [Project Website](http://w209project.s3-website-us-east-1.amazonaws.com/index.html)
+    * [Tour of Website](https://youtu.be/ZBqwIegUY6w?si=JnzDdskC1-uOIgvE)
 - [Garden Planner](https://github.com/mmartin131/portfolio/tree/main/Garden_Planner)
     * Summary: Individual project demonstrating object oriented programming using Python 
     * Tech stack: Python
